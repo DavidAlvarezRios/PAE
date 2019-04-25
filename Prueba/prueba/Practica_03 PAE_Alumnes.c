@@ -26,6 +26,13 @@
 #define MOV_RIGHT 1
 #define MOV_LEFT 2
 
+#define MOTOR_2 0x02
+#define MOTOR_3 0x03
+
+#define WRITE 3
+#define LED_MOTOR 0x19
+#define ENCENDER_LED 1
+
 char saludo[16] = " PRACTICA 4 PAE";//max 15 caracteres visibles
 char cadena[16];//Una linea entera con 15 caracteres visibles + uno oculto de terminacion de cadena (codigo ASCII 0)
 char borrado[] = "               "; //una linea entera de 15 espacios en blanco
@@ -42,7 +49,7 @@ uint32_t retraso = 200;
 //uint32_t tiempo = 0;
 uint8_t seg,min,hora = 0; // segons minuts hora actuals
 
-uint8_t Parametros[16];
+uint8_t Parametros[16]; //Parametres de les instruccions del motor.
 
 //Flags que utilitzarem per saber si modifiquem el rellotge o la alarma
 uint8_t modifica_hora = 1;
@@ -174,7 +181,7 @@ void init_uart(void)
     P3DIR |= BIT0; //Port P3.0 com sortida (Data Direction selector Tx/Rx)
     P3OUT &= ~BIT0; //Inicialitzem Sentit Dades a 0 (Rx)
     UCA2CTLW0 &= ~UCSWRST; //Reactivem la línia de comunicacions sèrie
-    // UCA2IE |= UCRXIE; //Això només s’ha d’activar quan tinguem la rutina de recepció
+    UCA2IE |= UCRXIE; //Això només s’ha d’activar quan tinguem la rutina de recepció
 }
 
 /**************************************************************************
@@ -1048,10 +1055,10 @@ void main(void)
             escribir(cadena, linea+6);          // Escribimos la cadena al LCD
         }
 
-
-
     }
-    Parametros[0] = 0x01;
-    TxPacket(0x02,4,0x19,Parametros);
+    Parametros[0] = LED_MOTOR;
+    Parametros[1] = ENCENDER_LED;
+    TxPacket(MOTOR_2,2,WRITE,Parametros);
+    TxPacket(MOTOR_3,2,WRITE,Parametros);
     }while(1); //Condicion para que el bucle sea infinito
 }
