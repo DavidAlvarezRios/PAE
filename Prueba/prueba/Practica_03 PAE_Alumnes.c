@@ -26,10 +26,32 @@
 #define MOV_RIGHT 1
 #define MOV_LEFT 2
 
+//ID'S DELS MOTOR
 #define MOTOR_2 0x02
 #define MOTOR_3 0x03
+#define SENSOR 0x64
 
-#define WRITE 3
+// INSTRUCCIONS MOTOR
+#define WRITE 0x03
+#define READ 0x02
+#define FORWARD 0x01
+#define BACKWARD 0x00
+#define LEFT 0x00
+#define RIGHT 0x02
+#define CENTER 0x01
+
+// ID'S SENSORS
+#define SENSOR_LEFT 0
+#define SENSOR_CENTER 1
+#define SENSOR_RIGHT 2
+
+// DIRECCIONS MOTOR
+#define SENTIT_CW 0x04
+#define SENTIT_CCW 0x00
+
+// VELOCITATS
+#define MOVING_SPEED 0x20
+
 #define LED_MOTOR 0x19
 #define ENCENDER_LED 1
 
@@ -70,10 +92,13 @@ uint8_t cambio_estado = 0; //esta variable sirve para cambiar la hora, minuto (0
 uint8_t velocitat = 0;
 uint8_t direccio_LED = 0;
 
-uint8_t si = 0;
-uint8_t no = 1;
+//Variables P4
+uint8_t si = 1;
+uint8_t no = 0;
 
 byte DatoLeido_UART = 0;
+
+uint8_t count_timeout = 0;
 
 
 //uint8_t ID_2 = 0x02;
@@ -84,8 +109,15 @@ byte Byte_Recibido = 1;
 struct RxReturn
 {
     byte StatusPacket[32];
+    uint8_t time_out;
+    uint8_t checkSum;
 };
 
+struct Data{
+    byte dades[3];
+    uint8_t time_out;
+    uint8_t checkSum;
+};
 
 /**************************************************************************
  * INICIALIZACIï¿½N DEL CONTROLADOR DE INTERRUPCIONES (NVIC).
@@ -121,6 +153,9 @@ void init_interrupciones()
     
     NVIC->ICPR[0] |= BITA; //Primero nos aseguramos de que no quede ninguna interrupcion residual para el timer TA1
     NVIC->ISER[0] |= BITA; //Habilitamos las interrupciones a nivel NVIC
+
+    NVIC->ICPR[0] |= BIT(18); // Aseguramos que no queda ninguna interrupcion residual
+    NVIC->ISER[0] |= BIT(18); //Habilitamos las interrupciones a nivel NVIC para el motor AX-S1
 
     __enable_interrupt(); //Habilitamos las interrupciones a nivel global del micro.
 }
@@ -159,7 +194,7 @@ void init_clock(void){
 void init_uart(void)
 {
     UCA2CTLW0 |= UCSWRST; //Fem un reset de la USCI, desactiva la USCI
-    UCA2CTLW0 |= UCSSEL__SMCLK; //UCSYNC=0 mode asíncron
+    UCA2CTLW0 |= UCSSEL__SMCLK; //UCSYNC=0 mode asï¿½ncron
     //UCMODEx=0;  //seleccionem mode UART
     //UCSPB=0;    //nomes 1 stop bit
     //UC7BIT=0;   //8 bits de dades
@@ -173,15 +208,15 @@ void init_uart(void)
     //volem un baud rate de 500kb/s i fem sobre-mostreig de 16
     //el rellotge de la UART ha de ser de 8MHz (24MHz/3).
     //Configurem els pins de la UART
-    P3SEL0 |= BIT2 | BIT3; //I/O funció: P3.3 = UART2TX, P3.2 = UART2RX
+    P3SEL0 |= BIT2 | BIT3; //I/O funciï¿½: P3.3 = UART2TX, P3.2 = UART2RX
     P3SEL1 &= ~ (BIT2 | BIT3);
-    //Configurem pin de selecció del sentit de les dades Transmissió/Recepeció
+    //Configurem pin de selecciï¿½ del sentit de les dades Transmissiï¿½/Recepeciï¿½
     P3SEL0 &= ~BIT0; //Port P3.0 com GPIO
     P3SEL1 &= ~BIT0;
     P3DIR |= BIT0; //Port P3.0 com sortida (Data Direction selector Tx/Rx)
     P3OUT &= ~BIT0; //Inicialitzem Sentit Dades a 0 (Rx)
-    UCA2CTLW0 &= ~UCSWRST; //Reactivem la línia de comunicacions sèrie
-    UCA2IE |= UCRXIE; //Això només s’ha d’activar quan tinguem la rutina de recepció
+    UCA2CTLW0 &= ~UCSWRST; //Reactivem la lï¿½nia de comunicacions sï¿½rie
+    UCA2IE |= UCRXIE; //Aixï¿½ nomï¿½s sï¿½ha dï¿½activar quan tinguem la rutina de recepciï¿½
 }
 
 /**************************************************************************
@@ -659,6 +694,7 @@ void TA1_0_IRQHandler(void)
 {
     TA1CCTL0 &=~CCIE;//Inhabilitem la interrupci0
     seg += 1; //contador segundos
+    count_timeout += 1; //augmentem el comptador del time out.
     TA1CCTL0 &= ~CCIFG;
     TA1CCTL0 |= CCIE;//Habilitem la interrupcio
 }
@@ -723,7 +759,7 @@ void sentit_dades_tx(void)
     P3OUT |= BIT0;
 }
 
-/*Funció que escriu un byte al buffer
+/*Funciï¿½ que escriu un byte al buffer
  *
  *Dades d'entrada: Byte amb la dada
  *
@@ -733,9 +769,26 @@ void sentit_dades_tx(void)
 
 void TxUAC2(byte bTxdData)
 {
-    while(!TXD2_READY); // Espera a que estigui preparat el buffer de transmissió
+    while(!TXD2_READY); // Espera a que estigui preparat el buffer de transmissiï¿½
     UCA2TXBUF = bTxdData;
 
+}
+
+void timeOut_Reset(void)
+{
+    count_timeout = 0;
+}
+
+byte TimeOut_check(uint8_t check)
+{
+    return count_timeout >= check;
+}
+
+void Activa_TimerA1_TimeOut()
+{
+     TA1CTL |= 0x0200;
+     TA1CCTL0 |= 0x0010;
+     TA1CCR0 = 24000;
 }
 
 /**
@@ -760,7 +813,7 @@ byte TxPacket(byte bID, byte bParameterLength, byte bInstruction, byte Parametro
     TxBuffer[1] = 0xff;
     TxBuffer[2] = bID; //ID del motor
     TxBuffer[3] = bLength; //Numero d'instruccions
-    TxBuffer[4] = bInstruction; //ID de la instrucció
+    TxBuffer[4] = bInstruction; //ID de la instrucciï¿½
 
     for(bCount = 0; bCount < bParameterLength; bCount++)
     {
@@ -790,7 +843,6 @@ byte TxPacket(byte bID, byte bParameterLength, byte bInstruction, byte Parametro
 
 }
 
-/*
 struct RxReturn RxPacket(void)
 {
     struct RxReturn resposta;
@@ -800,15 +852,93 @@ struct RxReturn RxPacket(void)
 
     sentit_dades_rx(); //Posem el sentit de les dades en rebent dades
 
-    //Activa_TimerA1_TimeOut();
+    Activa_TimerA1_TimeOut();
 
-    for(bCount = 0; bCount < 4; bCount++){
+    for(bCount = 0; bCount < 4; bCount++)
+    {
+        timeOut_Reset();
+        Byte_Recibido=0;
+        while(!Byte_Recibido)
+        {
+            Rx_time_out = TimeOut_check(1000);
+            if(Rx_time_out) break;
+        }
+        if(Rx_time_out) break;
+
+        resposta.StatusPacket[bCount] = DatoLeido_UART;
+    }
+    if(!Rx_time_out)    return resposta;
+
+    bLength = DatoLeido_UART + 4;
+    for(bCount = 0; bCount < bLength; bCount++)
+    {
+        timeOut_Reset();
+        Byte_Recibido=0;
+        while(!Byte_Recibido)
+        {
+            resposta.time_out= TimeOut_check(1000);
+            if(resposta.time_out)  break;
+        }
+        if(resposta.time_out)  return resposta;
+        resposta.StatusPacket[bCount] = DatoLeido_UART;
+
+        if(resposta.time_out)  return resposta;
+
+        bChecksum = 0;
+        for(bCount = 2; bCount < bLength-1; bCount++)
+        {
+            bChecksum+= resposta.StatusPacket[bCount];
+        }
+
+        bChecksum = ~bChecksum;
+        if(bChecksum != resposta.StatusPacket[bCount-1])    resposta.checkSum = 1;
 
     }
 
+    return resposta;
 
 }
-*/
+
+
+void moure_motor(uint8_t id, uint8_t sentit, uint16_t velocitat)
+{
+    byte parametres[3];
+    parametres[0]=MOVING_SPEED;
+    parametres[1]=velocitat & 0xff;
+    parametres[2]=(velocitat>>8) & 0xff;
+    parametres[2]|=sentit;
+    TxPacket(id,0x03,WRITE,parametres);
+}
+
+
+void moure_robot(uint8_t sentit, uint16_t velocitat)
+{
+    if(sentit == FORWARD)
+    {
+        moure_motor(MOTOR_2, SENTIT_CW, velocitat);
+        moure_motor(MOTOR_3, SENTIT_CCW, velocitat);
+    }
+    else
+    {
+        moure_motor(MOTOR_2, SENTIT_CCW, velocitat);
+        moure_motor(MOTOR_3, SENTIT_CW, velocitat);
+    }
+}
+
+
+void activate_led(void) {
+    byte parametres[2];
+    parametres[0] = 0x19;
+    parametres[1] = 0x01;
+    TxPacket(MOTOR_2,0x02,WRITE,parametres);
+    TxPacket(MOTOR_3,0x02,WRITE,parametres);
+}
+
+
+
+
+
+
 
 
 
@@ -839,8 +969,6 @@ void main(void)
     //Bucle principal (infinito):
     do
     {
-        imprimir_temps();
-        comprobar_alarma();
 
     if (estado_anterior != estado)          // Dependiendo del valor del estado se encenderï¿½ un LED u otro.
     {
@@ -848,9 +976,9 @@ void main(void)
                                                 //con formato decimal, 2 cifras, rellenando con 0 a la izquierda.
         escribir(cadena,linea); // Escribimos la cadena al LCD
 
-        sprintf(cadena, "a: %02d:%02d:%02d", hora_alarma, min_alarma,seg_alarma); // Guardamos en cadena la siguiente frase: alarma hora:min
-        escribir(cadena, linea+3);          // Escribimos la cadena al LCD
         estado_anterior = estado; // Actualizamos el valor de estado_anterior, para que no estï¿½ siempre escribiendo.
+
+        moure_motor(MOTOR_2, SENTIT_CCW, MOVING_SPEED);
 
         /**********************************************************+
             A RELLENAR POR EL ALUMNO BLOQUE switch ... case
@@ -872,22 +1000,6 @@ void main(void)
             P2OUT |= 0x10; //GREEN
             P5OUT |= 0x40;  //BLUE
 
-            if(modifica_alarma == 0){
-                modifica_alarma = 1;
-                modifica_hora = 0;
-
-
-
-
-            }else{
-                modifica_alarma = 0;
-                modifica_hora = 1;
-                //Parametros[0] = 0;
-                //TxPacket(0x02, 1,0x19,Parametros);
-            }
-            
-
-
             break;
 
         case S2:
@@ -897,16 +1009,9 @@ void main(void)
             P2OUT &= ~0x40; // APAGUEM LED RED
             P2OUT &= ~0x10; // APAGUEM LED GREEN
             P5OUT &= ~0x40; //APAGUEM LED BLUE
-
+            activate_led();
             //seg++;
 
-            if (cambio_estado == 0){
-                cambio_estado = 1;
-            }else{
-                cambio_estado = 0;
-            }
-
-            borrar(linea+5);
             break;
 
         case Jstick_Center:
@@ -918,18 +1023,9 @@ void main(void)
             //INVERTIM LED BLUE
             P5OUT ^= 0x40;
 
-            if(flag_retraso == 0)
-            {
-                flag_retraso = 1;
-            }else{
-                flag_retraso = 0;
-            }
-
             break;
 
         case Jstick_Left:
-
-            //direccio_LED = MOV_LEFT;
 
             //ENCENEM ELS 3 LEDS RGB
             P2OUT |= 0x40; //RED
@@ -961,29 +1057,6 @@ void main(void)
             P2OUT &= ~0x10; //APAGUEM GREEN
             P5OUT |= 0x40;  //ENCENEM BLUE
 
-
-
-            if(flag_retraso == 0)
-            {
-
-                if(retraso < 1000)
-                {
-                    retraso += 10;
-                }
-            }else{
-                if(modifica_hora)
-                {
-                    incrementar_hora();
-                    //modificar_alarma = 0;
-                }
-                else if(modifica_alarma)
-                {
-                    incrementar_alarma();
-                    //modifica_hora = 0;
-                }
-            }
-
-
             break;
 
         case Jstick_Down:
@@ -993,72 +1066,15 @@ void main(void)
             P2OUT |= 0x10; //ENCENEM GREEN
             P5OUT |= 0x40;  //ENCENEM BLUE
 
-
-
-            if(flag_retraso == 0){
-
-                if(retraso > 0)
-                {
-                    retraso -= 10;
-                }
-            }else{
-                if(modifica_hora){
-                    decrementar_hora();
-                }
-                else if(modifica_alarma)
-                {
-                    decrementar_alarma();
-                }
-            }
-
             break;
 
         default:
             break;
        }
 
-        sprintf(cadena, "retras: %04d", retraso); // Mostramos por pantalla el retraso actual. MAX 3000
-        escribir(cadena, linea+1);
-
-        if(flag_retraso == 0)
-        {
-            borrar(linea+4);
-            sprintf(cadena, "canviant delay"); // Guardamos en cadena la siguiente frase: alarma hora:min
-            escribir(cadena, linea+4);
-        }else{
-            if(modifica_alarma)
-            {
-                borrar(linea+4);
-                sprintf(cadena, "modifica alarma"); // Guardamos en cadena la siguiente frase: alarma hora:min
-                escribir(cadena, linea+4);          // Escribimos la cadena al LCD
-            }
-
-            if(modifica_hora)
-            {
-                borrar(linea+4);
-                sprintf(cadena, "modifica temps"); // Guardamos en cadena la siguiente frase: alarma hora:min
-                escribir(cadena, linea+4);          // Escribimos la cadena al LCD
-            }
-        }
-
-
-
-        if(cambio_estado == 1){
-
-            borrar(linea+6);
-            sprintf(cadena, "canviant mins.."); // Guardamos en cadena la siguiente frase: alarma hora:min
-            escribir(cadena, linea+6);          // Escribimos la cadena al LCD
-        }else{
-
-            borrar(linea+6);
-            sprintf(cadena, "canviant hora.."); // Guardamos en cadena la siguiente frase: alarma hora:min
-            escribir(cadena, linea+6);          // Escribimos la cadena al LCD
-        }
-
     }
-    Parametros[0] = LED_MOTOR;
-    Parametros[1] = ENCENDER_LED;
-    TxPacket(MOTOR_2,2,WRITE,Parametros);
-    TxPacket(MOTOR_3,2,WRITE,Parametros);
+
     }while(1); //Condicion para que el bucle sea infinito
 }
+
+
