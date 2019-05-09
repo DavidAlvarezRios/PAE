@@ -1,0 +1,1 @@
+"./Practica_04 PAE_Alumnes.obj" "./lib_UART.obj" "./lib_motor.obj" "./startup_msp432p401r_ccs.obj" "./system_msp432p401r.obj" "../lib_PAE2.lib" "../msp432p401r.cmd" -llibc.a 
