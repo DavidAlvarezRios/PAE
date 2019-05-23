@@ -36,6 +36,17 @@
 // VELOCITATS
 #define MOVING_SPEED 0x20
 
+
+
+uint8_t s_left;
+uint8_t s_center;
+uint8_t s_right;
+
+uint8_t s_left_ant;
+uint8_t s_center_ant;
+uint8_t s_right_ant;
+
+
 void move_forward(void);
 void move_backward(void);
 void move_left(void);

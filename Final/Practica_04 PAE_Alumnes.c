@@ -28,6 +28,13 @@
 #define LED_MOTOR 0x19
 #define ENCENDER_LED 1
 
+#define LEFT_DIR 0
+#define RIGHT_DIR 1
+#define FORWARD_DIR 2
+#define BOTH 3
+#define ALL 4
+
+
 
 char saludo[16] = " PRACTICA 4 PAE";//max 15 caracteres visibles
 
@@ -254,6 +261,7 @@ void PORT3_IRQHandler(void){//interrupcion del pulsador S2
     switch(flag){
     case 0x0C: //S2
         estado = S2;
+        decrease_speed();
         break;
     }
 
@@ -342,6 +350,7 @@ void PORT5_IRQHandler(void){  //interrupci�n de los botones. Actualiza el valo
                 break;
             case 0x04:
                 estado = S1; //S1
+                increase_speed();
                 break;
             }
 
@@ -358,36 +367,99 @@ void drift(void)
     obstacle = obstacle_detected();
     print_obstacle(obstacle);
 
-    if(detected != obstacle.StatusPacket[5]){
-        switch(obstacle.StatusPacket[5]){
-            case 0:
-                move_forward();
-                break;
-            case 1:
-                move_forward();
-                break;
-            case 2:
-                move_right();
-                break;
-            case 3:
-                move_right();
-                break;
-            case 4:
-                move_forward();
-                break;
-            case 5:
-                move_forward();
-                break;
-            case 6:
-                move_left();
-                break;
-            case 7:
-                move_backward();
-                break;
+    switch(obstacle.StatusPacket[5]){
+        case 0:
+            detected = FORWARD_DIR;
+            move_forward();
+            break;
+        case 1:
+            detected = LEFT_DIR;
+            move_forward();
+            break;
+        case 2:
+            detected = LEFT_DIR;
+            delay_t(1000*2);
+            move_right();
+            delay_t(1000*2);
+            break;
+        case 3:
+            detected = LEFT_DIR;
+            delay_t(1000*2);
+            move_right();
+            delay_t(1000*2);
+            break;
+        case 4:
+            detected = FORWARD_DIR;
+            move_forward();
+            break;
+        case 5:
+            detected = BOTH;
+            move_forward();
+            break;
+        case 6:
+            detected = RIGHT_DIR;
+            delay_t(1000*2);
+            move_left();
+            delay_t(1000*2);
+            break;
+        case 7:
+            detected = ALL;
+            move_backward();
+            break;
+    }
+}
 
+void move_to(uint8_t direction)
+{
+    switch(direction)
+    {
+    case 0:
+        move_forward();
+        break;
+    case 1:
+        move_right();
+        break;
+    case 2:
+        move_left();
+        break;
+    case 3:
+        move_backward();
+        break;
 
+    }
+}
+
+void changed(void)
+{
+    struct RxReturn obstacle;
+    obstacle = obstacle_detected();
+    print_obstacle(obstacle);
+
+    while(obstacle.StatusPacket[5] == 0)
+    {
+        obstacle = obstacle_detected();
+        print_obstacle(obstacle);
+
+        switch(detected)
+        {
+            case RIGHT_DIR:
+                move_to(2);
+                break;
+            case LEFT_DIR:
+                move_to(1);
+                break;
+            case FORWARD_DIR:
+                move_to(0);
+                break;
+            case BOTH:
+                move_to(0);
+                break;
+            case ALL:
+                move_to(3);
+                break;
         }
     }
+
 
 
 }
@@ -414,56 +486,57 @@ void main(void)
     change_detection_distance();
     do
     {
-    read_sensors();
-    drift();
-    if (estado_anterior != estado)          // Dependiendo del valor del estado se encender� un LED u otro.
-    {
-        //sprintf(cadena,"Estado %02d", estado);  // Guardamos en cadena la siguiente frase: Estado "valor del estado",
-                                                //con formato decimal, 2 cifras, rellenando con 0 a la izquierda.
-        //escribir(cadena,linea); // Escribimos la cadena al LCD
+        read_sensors();
+        drift();
+        changed();
+        if (estado_anterior != estado)          // Dependiendo del valor del estado se encender� un LED u otro.
+        {
+            //sprintf(cadena,"Estado %02d", estado);  // Guardamos en cadena la siguiente frase: Estado "valor del estado",
+                                                    //con formato decimal, 2 cifras, rellenando con 0 a la izquierda.
+            //escribir(cadena,linea); // Escribimos la cadena al LCD
 
-        estado_anterior = estado; // Actualizamos el valor de estado_anterior, para que no est� siempre escribiendo.
+            estado_anterior = estado; // Actualizamos el valor de estado_anterior, para que no est� siempre escribiendo.
 
 
 
-        /**********************************************************+
-            A RELLENAR POR EL ALUMNO BLOQUE switch ... case
-        Para gestionar las acciones:
-        Boton S1, estado = 1
-        Boton S2, estado = 2
-        Joystick left, estado = 3
-        Joystick right, estado = 4
-        Joystick up, estado = 5
-        Joystick down, estado = 6
-        Joystick center, estado = 7
-        ***********************************************************/
+            /**********************************************************+
+                A RELLENAR POR EL ALUMNO BLOQUE switch ... case
+            Para gestionar las acciones:
+            Boton S1, estado = 1
+            Boton S2, estado = 2
+            Joystick left, estado = 3
+            Joystick right, estado = 4
+            Joystick up, estado = 5
+            Joystick down, estado = 6
+            Joystick center, estado = 7
+            ***********************************************************/
 
-        switch(estado){
-        case S1:
-            increase_speed();
-            break;
-        case S2:
-            decrease_speed();
-            break;
-        case Jstick_Center:
-            stop();
-            break;
-        case Jstick_Left:
-            move_left();
-            break;
-        case Jstick_Right:
-            move_right();
-            break;
-        case Jstick_Up:
-            move_forward();
-            break;
-        case Jstick_Down:
-            move_backward();
-            break;
-        default:
-            break;
-       }
-    }
+            switch(estado){
+            case S1:
+
+                break;
+            case S2:
+
+                break;
+            case Jstick_Center:
+                stop();
+                break;
+            case Jstick_Left:
+                move_left();
+                break;
+            case Jstick_Right:
+                move_right();
+                break;
+            case Jstick_Up:
+                move_forward();
+                break;
+            case Jstick_Down:
+                move_backward();
+                break;
+            default:
+                break;
+           }
+        }
 
     }while(1); //Condicion para que el bucle sea infinito
 }

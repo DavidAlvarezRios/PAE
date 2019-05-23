@@ -15,8 +15,6 @@
 uint16_t velocidad = 250;
 char cadena[16];//Una linea entera con 15 caracteres visibles + uno oculto de terminacion de cadena (codigo ASCII 0)
 
-
-
 /**
  * Funcio que mou el robot cap a endavant
  */
@@ -130,10 +128,13 @@ void print_distance(uint8_t distance, uint8_t sensor)
 
 }
 
+/**
+ * Augmenta la distancia a la que es detecta un obstacle.
+ */
 void change_detection_distance(void)
 {
 
-    byte parametres[2] = {0x34,0x32};
+    byte parametres[2] = {0x34,100};
     TxPacket(SENSOR, 0x02, WRITE, parametres);
 }
 
@@ -147,16 +148,20 @@ void read_sensors(void)
     byte parametres_left[2] = {SENSOR_LEFT, 1};
     TxPacket(SENSOR, 0x02, READ, parametres_left);
     resposta = RxPacket();
-    print_distance(resposta.StatusPacket[5], 1);
+    s_left = resposta.StatusPacket[5];
+    print_distance(s_left, 1);
     byte parametres_center[2] = {SENSOR_CENTER, 1};
     TxPacket(SENSOR, 0x02, READ, parametres_center);
     resposta = RxPacket();
-    print_distance(resposta.StatusPacket[5], 2);
+    s_center = resposta.StatusPacket[5];
+    print_distance(s_center, 2);
     byte parametres_right[2] = {SENSOR_RIGHT, 1};
     TxPacket(SENSOR, 0x02, READ, parametres_right);
     resposta = RxPacket();
-    print_distance(resposta.StatusPacket[5], 3);
+    s_right = resposta.StatusPacket[5];
+    print_distance(s_right, 3);
 }
+
 
 struct RxReturn obstacle_detected(void)
 {
