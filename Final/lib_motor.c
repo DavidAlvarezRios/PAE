@@ -104,7 +104,7 @@ void stop(void)
  * Dades d'entrada: distancia, ID del sensor (1 esquerra, 2 central, 3 dreta)
  *
  * Dades sortida: cap
- */
+ *
 void print_distance(uint8_t distance, uint8_t sensor)
 {
 
@@ -126,6 +126,20 @@ void print_distance(uint8_t distance, uint8_t sensor)
     }
 
 
+}*/
+
+void print_distance(byte left, byte center, byte right)
+{
+
+
+    sprintf(cadena,"Left %03d", left);
+    escribir(cadena,3); // Escribimos la cadena al LCD
+    sprintf(cadena,"Center %03d", center);
+    escribir(cadena,4); // Escribimos la cadena al LCD
+    sprintf(cadena,"Right %03d", right);
+    escribir(cadena,5); // Escribimos la cadena al LCD
+
+
 }
 
 /**
@@ -134,34 +148,24 @@ void print_distance(uint8_t distance, uint8_t sensor)
 void change_detection_distance(void)
 {
 
-    byte parametres[2] = {0x34,100};
+    byte parametres[2] = {0x34,50};
     TxPacket(SENSOR, 0x02, WRITE, parametres);
 }
 
 
 /**
- * Funció per demanar informació als sensors.
+ * Funciï¿½ per demanar informaciï¿½ als sensors.
  */
-void read_sensors(void)
+
+struct RxReturn read_sensors(void)
 {
     struct RxReturn resposta;
-    byte parametres_left[2] = {SENSOR_LEFT, 1};
-    TxPacket(SENSOR, 0x02, READ, parametres_left);
+    byte parametres[2] = {SENSOR_LEFT, 3};
+    TxPacket(SENSOR, 0x02, READ, parametres);
     resposta = RxPacket();
-    s_left = resposta.StatusPacket[5];
-    print_distance(s_left, 1);
-    byte parametres_center[2] = {SENSOR_CENTER, 1};
-    TxPacket(SENSOR, 0x02, READ, parametres_center);
-    resposta = RxPacket();
-    s_center = resposta.StatusPacket[5];
-    print_distance(s_center, 2);
-    byte parametres_right[2] = {SENSOR_RIGHT, 1};
-    TxPacket(SENSOR, 0x02, READ, parametres_right);
-    resposta = RxPacket();
-    s_right = resposta.StatusPacket[5];
-    print_distance(s_right, 3);
-}
-
+    print_distance(resposta.StatusPacket[5], resposta.StatusPacket[6], resposta.StatusPacket[7]);
+    return resposta;
+} 
 
 struct RxReturn obstacle_detected(void)
 {

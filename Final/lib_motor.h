@@ -54,9 +54,9 @@ void move_right(void);
 void increase_speed(void);
 void decrease_speed(void);
 void stop(void);
-void print_distance(uint8_t distance, uint8_t sensor);
+void print_distance(byte left, byte center, byte right);
 void change_detection_distance(void);
-void read_sensors(void);
+struct RxReturn read_sensors(void);
 struct RxReturn obstacle_detected(void);
 void print_obstacle(struct RxReturn atope);
 

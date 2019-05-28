@@ -70,6 +70,7 @@ uint8_t direccio_LED = 0;
 
 
 uint8_t detected = 9;
+byte encontrar_pared = 0;
 
 
 /**************************************************************************
@@ -460,8 +461,104 @@ void changed(void)
         }
     }
 
+}
 
 
+void follow_left(byte left, byte center, byte right, byte obstacle)
+{
+    if(!encontrar_pared)
+    {
+        move_forward();
+        delay_t(1500);
+        if(obstacle == 2 || obstacle == 3)
+        {
+            encontrar_pared = 1;
+
+        }
+    }else{
+
+        if(obstacle == 0)
+        {
+            delay_t(1000);
+            move_left();
+            delay_t(500);
+            move_forward();
+
+        }
+
+        else if(obstacle == 2 || obstacle == 3)
+        {
+            delay_t(1500);
+            move_right();
+            delay_t(1500);
+            move_forward();
+            if(center > 200)
+            {
+                move_backward();
+            }
+
+        }
+
+        else if(obstacle == 1 )
+        {
+            move_forward();
+            delay_t(1500);
+            if(left > 200)
+            {
+                move_right();
+                delay_t(500);
+            }
+            //comprobar distancia, si se acerca mucho, se gira a la derecha.
+        }
+    }
+}
+
+void follow_right(byte left, byte center, byte right, byte obstacle)
+{
+    if(!encontrar_pared)
+    {
+        move_forward();
+        delay_t(1500);
+        if(obstacle == 2 || obstacle == 6)
+        {
+            encontrar_pared = 1;
+
+        }
+    }else{
+
+        if(obstacle == 0)
+        {
+            delay_t(1000);
+            move_right();
+            delay_t(500);
+            move_forward();
+
+        }
+
+        else if(obstacle == 2 || obstacle == 6)
+        {
+            delay_t(1500);
+            move_left();
+            delay_t(1500);
+            move_forward();
+            if(center > 200)
+            {
+                move_backward();
+            }
+
+        }
+        else if(obstacle == 4 )
+        {
+            move_forward();
+            delay_t(1500);
+            if(right > 200)
+            {
+                move_left();
+                delay_t(500);
+            }
+            //comprobar distancia, si se acerca mucho, se gira a la derecha.
+        }
+    }
 }
 
 void main(void)
@@ -481,15 +578,77 @@ void main(void)
     halLcdPrintLine(saludo,linea, INVERT_TEXT); //escribimos saludo en la primera linea
     linea++; //Aumentamos el valor de linea y con ello pasamos a la linea siguiente
 
+
+    struct RxReturn obstacle;
+    struct RxReturn distances;
+
+    encontrar_pared = 0;
     //Bucle principal (infinito):
 
     change_detection_distance();
     do
     {
-        read_sensors();
-        drift();
-        changed();
-        if (estado_anterior != estado)          // Dependiendo del valor del estado se encender� un LED u otro.
+        distances = read_sensors();
+        //drift();
+        //changed();
+        obstacle = obstacle_detected();
+        print_obstacle(obstacle);
+        byte left = distances.StatusPacket[5];
+        byte center = distances.StatusPacket[6];
+        byte right = distances.StatusPacket[7];
+        byte obstacles = obstacle.StatusPacket[5];
+
+        follow_left(left, center, right, obstacles);
+        //follow_right(left, center, right, obstacles);
+        /*
+        if(!encontrar_pared)
+        {
+            move_forward();
+            delay_t(1500);
+            if(obstacle.StatusPacket[5] == 2)
+            {
+                encontrar_pared = 1;
+
+            }
+        }else{
+
+            if(obstacle.StatusPacket[5] == 0)
+            {
+                delay_t(1000);
+                move_left();
+                delay_t(500);
+                move_forward();
+
+            }
+
+            else if(obstacle.StatusPacket[5] == 2 || obstacle.StatusPacket[5] == 3)
+            {
+                delay_t(1500);
+                move_right();
+                delay_t(1500);
+                move_forward();
+                if(distances.StatusPacket[6] > 200)
+                {
+                    move_backward();
+                }
+
+            }
+
+            else if(obstacle.StatusPacket[5] == 1 )
+            {
+                move_forward();
+                delay_t(1500);
+                if(distances.StatusPacket[5] > 200)
+                {
+                    move_right();
+                    delay_t(500);
+                }
+                //comprobar distancia, si se acerca mucho, se gira a la derecha.
+            }
+        }
+        */
+
+        if (estado_anterior != estado)  
         {
             //sprintf(cadena,"Estado %02d", estado);  // Guardamos en cadena la siguiente frase: Estado "valor del estado",
                                                     //con formato decimal, 2 cifras, rellenando con 0 a la izquierda.
@@ -513,25 +672,25 @@ void main(void)
 
             switch(estado){
             case S1:
-
+                increase_speed();
                 break;
             case S2:
-
+                decrease_speed();
                 break;
             case Jstick_Center:
-                stop();
+                
                 break;
             case Jstick_Left:
-                move_left();
+                
                 break;
             case Jstick_Right:
-                move_right();
+                
                 break;
             case Jstick_Up:
-                move_forward();
+                
                 break;
             case Jstick_Down:
-                move_backward();
+                
                 break;
             default:
                 break;
