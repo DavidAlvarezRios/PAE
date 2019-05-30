@@ -35,30 +35,14 @@
 #define ALL 4
 
 
-
-char saludo[16] = " PRACTICA 4 PAE";//max 15 caracteres visibles
+char saludo[16] = " FINAL PAE";//max 15 caracteres visibles
+char cadena[16];
 
 uint8_t linea = 1;
 uint8_t estado=0;
 uint8_t estado_anterior = 8;
 
 uint32_t retraso = 200;
-//uint32_t tiempo = 0;
-uint8_t seg,min,hora = 0; // segons minuts hora actuals
-
-//uint8_t Parametros[16]; //Parametres de les instruccions del motor.
-
-//Flags que utilitzarem per saber si modifiquem el rellotge o la alarma
-uint8_t modifica_hora = 1;
-uint8_t modifica_alarma = 0;
-
-uint8_t min_alarma = 1; //Posem la alarma per defecte que soni a les 00:01:00
-uint8_t hora_alarma = 0;
-uint8_t seg_alarma = 0;
-
-uint8_t flag_retraso = 0; //0 modificamos retraso, 1 no lo modificamos se cambia con Jstick_Center
-
-uint8_t cambio_estado = 0; //esta variable sirve para cambiar la hora, minuto (0, 1)
 
 //Necesitamos una variable para almacenar los valores de la v (Cuando movemos el JoyStick hacia arriba o hacia abajo)
 // Y tambien necesitamos otra variable para saber si los LEDs se enciended de derecha a izquierda o al reves
@@ -71,7 +55,19 @@ uint8_t direccio_LED = 0;
 
 uint8_t detected = 9;
 byte encontrar_pared = 0;
+byte menu = 1;
 
+byte center_sensor = 15;
+byte left_sensor = 15;
+byte right_sensor = 15;
+
+byte min_center_sensor = 255;
+byte min_left_sensor = 255;
+byte min_right_sensor = 255;
+
+byte option = 0;
+byte option_sub = 0;
+byte calibrar = 0;
 
 /**************************************************************************
  * INICIALIZACI�N DEL CONTROLADOR DE INTERRUPCIONES (NVIC).
@@ -262,7 +258,12 @@ void PORT3_IRQHandler(void){//interrupcion del pulsador S2
     switch(flag){
     case 0x0C: //S2
         estado = S2;
-        decrease_speed();
+        if(menu){
+
+        }else{
+            decrease_speed();
+        }
+
         break;
     }
 
@@ -351,7 +352,9 @@ void PORT5_IRQHandler(void){  //interrupci�n de los botones. Actualiza el valo
                 break;
             case 0x04:
                 estado = S1; //S1
-                increase_speed();
+                if(!menu){
+                    increase_speed();
+                }
                 break;
             }
 
@@ -464,20 +467,20 @@ void changed(void)
 }
 
 
-void follow_left(byte left, byte center, byte right, byte obstacle)
+void follow_left(byte left, byte center, byte right)
 {
     if(!encontrar_pared)
     {
         move_forward();
-        delay_t(1500);
-        if(obstacle == 2 || obstacle == 3)
+        delay_t(500);
+        if(center > center_sensor || (center > center_sensor && left > left_sensor ))
         {
             encontrar_pared = 1;
 
         }
     }else{
 
-        if(obstacle == 0)
+        if(center < center_sensor && left < left_sensor && right < right_sensor)
         {
             delay_t(1000);
             move_left();
@@ -486,24 +489,24 @@ void follow_left(byte left, byte center, byte right, byte obstacle)
 
         }
 
-        else if(obstacle == 2 || obstacle == 3)
+        else if(center > center_sensor || (center > center_sensor && left > left_sensor ))
         {
-            delay_t(1500);
+            delay_t(1000);
             move_right();
-            delay_t(1500);
+            delay_t(1000);
             move_forward();
-            if(center > 200)
+            if(center > 150)
             {
                 move_backward();
             }
 
         }
 
-        else if(obstacle == 1 )
+        else if(left > left_sensor)
         {
             move_forward();
-            delay_t(1500);
-            if(left > 200)
+            delay_t(1000);
+            if(left > 150)
             {
                 move_right();
                 delay_t(500);
@@ -513,20 +516,20 @@ void follow_left(byte left, byte center, byte right, byte obstacle)
     }
 }
 
-void follow_right(byte left, byte center, byte right, byte obstacle)
+void follow_right(byte left, byte center, byte right)
 {
     if(!encontrar_pared)
     {
         move_forward();
         delay_t(1500);
-        if(obstacle == 2 || obstacle == 6)
+        if(center > center_sensor || (center > center_sensor && right > right_sensor ))
         {
             encontrar_pared = 1;
 
         }
     }else{
 
-        if(obstacle == 0)
+        if(center < center_sensor && left < left_sensor && right < right_sensor)
         {
             delay_t(1000);
             move_right();
@@ -535,29 +538,99 @@ void follow_right(byte left, byte center, byte right, byte obstacle)
 
         }
 
-        else if(obstacle == 2 || obstacle == 6)
+        else if(center > center_sensor || (center > center_sensor && right > right_sensor ))
         {
             delay_t(1500);
             move_left();
             delay_t(1500);
             move_forward();
-            if(center > 200)
+            if(center > 150)
             {
                 move_backward();
             }
 
         }
-        else if(obstacle == 4 )
+        else if(right > right_sensor)
         {
             move_forward();
             delay_t(1500);
-            if(right > 200)
+            if(right > 150)
             {
                 move_left();
                 delay_t(500);
             }
             //comprobar distancia, si se acerca mucho, se gira a la derecha.
         }
+    }
+}
+
+void set_distance_center(byte distance)
+{
+    center_sensor = distance;
+    min_center_sensor = min_center_sensor - distance;
+}
+
+void set_distance_left(byte distance)
+{
+    left_sensor = distance;
+    min_left_sensor = min_left_sensor - distance;
+}
+
+void set_distance_right(byte distance)
+{
+    right_sensor = distance;
+    min_right_sensor = min_right_sensor - distance;
+}
+
+void menu_principal(void)
+{
+    sprintf(cadena,"Calibrar");
+    if(option == 0){
+        halLcdPrintLine(cadena, linea+3, INVERT_TEXT); //escribimos saludo en la primera linea
+    }else{
+        halLcdPrintLine(cadena, linea+3, NORMAL_TEXT); //escribimos saludo en la primera linea
+    }
+    sprintf(cadena,"Follow Left");
+    if(option == 1){
+        halLcdPrintLine(cadena, linea+4, INVERT_TEXT); //escribimos saludo en la primera linea
+    }else{
+        halLcdPrintLine(cadena, linea+4, NORMAL_TEXT); //escribimos saludo en la primera linea
+    }
+    sprintf(cadena,"Follow Right");
+    if(option == 2){
+        halLcdPrintLine(cadena, linea+5, INVERT_TEXT); //escribimos saludo en la primera linea
+    }else{
+        halLcdPrintLine(cadena, linea+5, NORMAL_TEXT); //escribimos saludo en la primera linea
+    }
+
+}
+
+void borrar_menu(void)
+{
+    borrar(linea+3);
+    borrar(linea+4);
+    borrar(linea+5);
+}
+
+void sub_menu(void)
+{
+    sprintf(cadena,"Calibrar Left");
+    if(option_sub == 0){
+        halLcdPrintLine(cadena, linea+3, INVERT_TEXT); //escribimos saludo en la primera linea
+    }else{
+        halLcdPrintLine(cadena, linea+3, NORMAL_TEXT); //escribimos saludo en la primera linea
+    }
+    sprintf(cadena,"Calibrar Center");
+    if(option_sub == 1){
+        halLcdPrintLine(cadena, linea+4, INVERT_TEXT); //escribimos saludo en la primera linea
+    }else{
+        halLcdPrintLine(cadena, linea+4, NORMAL_TEXT); //escribimos saludo en la primera linea
+    }
+    sprintf(cadena,"Calibrar Right");
+    if(option_sub == 2){
+        halLcdPrintLine(cadena, linea+5, INVERT_TEXT); //escribimos saludo en la primera linea
+    }else{
+        halLcdPrintLine(cadena, linea+5, NORMAL_TEXT); //escribimos saludo en la primera linea
     }
 }
 
@@ -579,75 +652,25 @@ void main(void)
     linea++; //Aumentamos el valor de linea y con ello pasamos a la linea siguiente
 
 
-    struct RxReturn obstacle;
+    //struct RxReturn obstacle;
     struct RxReturn distances;
 
     encontrar_pared = 0;
     //Bucle principal (infinito):
 
-    change_detection_distance();
+    //change_detection_distance();
     do
     {
-        distances = read_sensors();
+
         //drift();
         //changed();
-        obstacle = obstacle_detected();
-        print_obstacle(obstacle);
-        byte left = distances.StatusPacket[5];
-        byte center = distances.StatusPacket[6];
-        byte right = distances.StatusPacket[7];
-        byte obstacles = obstacle.StatusPacket[5];
+        //byte left = distances.StatusPacket[5];
+        //byte center = distances.StatusPacket[6];
+        //byte right = distances.StatusPacket[7];
 
-        follow_left(left, center, right, obstacles);
-        //follow_right(left, center, right, obstacles);
-        /*
-        if(!encontrar_pared)
-        {
-            move_forward();
-            delay_t(1500);
-            if(obstacle.StatusPacket[5] == 2)
-            {
-                encontrar_pared = 1;
-
-            }
-        }else{
-
-            if(obstacle.StatusPacket[5] == 0)
-            {
-                delay_t(1000);
-                move_left();
-                delay_t(500);
-                move_forward();
-
-            }
-
-            else if(obstacle.StatusPacket[5] == 2 || obstacle.StatusPacket[5] == 3)
-            {
-                delay_t(1500);
-                move_right();
-                delay_t(1500);
-                move_forward();
-                if(distances.StatusPacket[6] > 200)
-                {
-                    move_backward();
-                }
-
-            }
-
-            else if(obstacle.StatusPacket[5] == 1 )
-            {
-                move_forward();
-                delay_t(1500);
-                if(distances.StatusPacket[5] > 200)
-                {
-                    move_right();
-                    delay_t(500);
-                }
-                //comprobar distancia, si se acerca mucho, se gira a la derecha.
-            }
-        }
-        */
-
+        //follow_left(left, center, right, obstacles);
+        //follow_right(left, center, right);
+        menu_principal();
         if (estado_anterior != estado)  
         {
             //sprintf(cadena,"Estado %02d", estado);  // Guardamos en cadena la siguiente frase: Estado "valor del estado",
@@ -672,13 +695,65 @@ void main(void)
 
             switch(estado){
             case S1:
-                increase_speed();
+
+                if(menu)
+                {
+                    if(!calibrar){
+                        switch(option)
+                        {
+                        case 0:
+                            calibrar = 1;
+                            sub_menu();
+                            break;
+                        case 1:
+
+                                menu = 0;
+                                borrar_menu();
+                                while(estado != Jstick_Center)
+                                {
+
+                                    distances = read_sensors();
+                                    byte left = distances.StatusPacket[5];
+                                    byte center = distances.StatusPacket[6];
+                                    byte right = distances.StatusPacket[7];
+
+                                    follow_left(left, center, right);
+                                }
+                                menu = 1;
+                            }else{
+                                distances = read_sensors();
+                                byte center = distances.StatusPacket[6];
+                                set_distance_center(center);
+
+                            break;
+                        case 2:
+                            menu=0;
+                            borrar_menu();
+                            while(estado != Jstick_Center)
+                            {
+
+                                distances = read_sensors();
+                                byte left = distances.StatusPacket[5];
+                                byte center = distances.StatusPacket[6];
+                                byte right = distances.StatusPacket[7];
+
+                                follow_right(left, center, right);
+                            }
+                            menu = 1;
+                            break;
+
+                        }
+                    }
+                }
                 break;
             case S2:
                 decrease_speed();
                 break;
             case Jstick_Center:
-                
+                stop();
+                borrar(3);
+                borrar(4);
+                borrar(5);
                 break;
             case Jstick_Left:
                 
@@ -687,9 +762,13 @@ void main(void)
                 
                 break;
             case Jstick_Up:
-                
+                option = option - 1;
+                if(option == 255){
+                    option = 0;
+                }
                 break;
             case Jstick_Down:
+                option = (option + 1)%3;
                 
                 break;
             default:

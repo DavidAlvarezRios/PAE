@@ -71,7 +71,7 @@ void move_right(void)
 void increase_speed(void)
 {
     if(velocidad < MAX_SPEED){
-        velocidad += 100;
+        velocidad += 50;
     }
 
 }
@@ -82,7 +82,7 @@ void increase_speed(void)
 void decrease_speed(void)
 {
     if(velocidad > 0){
-        velocidad -= 100;
+        velocidad -= 50;
     }
 }
 
@@ -145,13 +145,12 @@ void print_distance(byte left, byte center, byte right)
 /**
  * Augmenta la distancia a la que es detecta un obstacle.
  */
-void change_detection_distance(void)
+void change_detection_center(void)
 {
 
     byte parametres[2] = {0x34,50};
     TxPacket(SENSOR, 0x02, WRITE, parametres);
 }
-
 
 /**
  * Funci� per demanar informaci� als sensors.
