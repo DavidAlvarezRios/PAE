@@ -46,6 +46,8 @@ uint8_t s_left_ant;
 uint8_t s_center_ant;
 uint8_t s_right_ant;
 
+extern uint16_t velocidad;
+
 
 void move_forward(void);
 void move_backward(void);
@@ -55,6 +57,7 @@ void increase_speed(void);
 void decrease_speed(void);
 void stop(void);
 void print_distance(byte left, byte center, byte right);
+void print_distance_sensor(uint8_t distance, uint8_t sensor);
 void change_detection_distance(void);
 struct RxReturn read_sensors(void);
 struct RxReturn obstacle_detected(void);

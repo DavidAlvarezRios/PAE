@@ -192,7 +192,6 @@ struct RxReturn RxPacket(void){
         while (Byte_Recibido == 0){
             Rx_time_out = TimeOut_check(10);
             if(Rx_time_out){
-
                 break;
             }
         }

@@ -56,14 +56,16 @@ uint8_t direccio_LED = 0;
 uint8_t detected = 9;
 byte encontrar_pared = 0;
 byte menu = 1;
+byte action = 0;
+byte calibra = 0;
 
 byte center_sensor = 15;
 byte left_sensor = 15;
 byte right_sensor = 15;
 
-byte min_center_sensor = 255;
-byte min_left_sensor = 255;
-byte min_right_sensor = 255;
+byte min_center_sensor = 200;
+byte min_left_sensor = 200;
+byte min_right_sensor = 200;
 
 byte option = 0;
 byte option_sub = 0;
@@ -258,11 +260,15 @@ void PORT3_IRQHandler(void){//interrupcion del pulsador S2
     switch(flag){
     case 0x0C: //S2
         estado = S2;
-        if(menu){
-
-        }else{
-            decrease_speed();
+        if(action){
+            if(velocidad > 0){
+                velocidad -= 50;
+            }
+        }else if(calibrar && !calibra){
+            calibra = 1;
         }
+
+
 
         break;
     }
@@ -352,8 +358,10 @@ void PORT5_IRQHandler(void){  //interrupci�n de los botones. Actualiza el valo
                 break;
             case 0x04:
                 estado = S1; //S1
-                if(!menu){
-                    increase_speed();
+                if(action){
+                    if(velocidad < MAX_SPEED){
+                        velocidad += 50;
+                    }
                 }
                 break;
             }
@@ -521,7 +529,7 @@ void follow_right(byte left, byte center, byte right)
     if(!encontrar_pared)
     {
         move_forward();
-        delay_t(1500);
+        delay_t(500);
         if(center > center_sensor || (center > center_sensor && right > right_sensor ))
         {
             encontrar_pared = 1;
@@ -567,19 +575,19 @@ void follow_right(byte left, byte center, byte right)
 void set_distance_center(byte distance)
 {
     center_sensor = distance;
-    min_center_sensor = min_center_sensor - distance;
+    //min_center_sensor = min_center_sensor - distance;
 }
 
 void set_distance_left(byte distance)
 {
     left_sensor = distance;
-    min_left_sensor = min_left_sensor - distance;
+    //min_left_sensor = min_left_sensor - distance;
 }
 
 void set_distance_right(byte distance)
 {
     right_sensor = distance;
-    min_right_sensor = min_right_sensor - distance;
+    //min_right_sensor = min_right_sensor - distance;
 }
 
 void menu_principal(void)
@@ -632,6 +640,36 @@ void sub_menu(void)
     }else{
         halLcdPrintLine(cadena, linea+5, NORMAL_TEXT); //escribimos saludo en la primera linea
     }
+    sprintf(cadena,"Atras");
+    if(option_sub == 3){
+        halLcdPrintLine(cadena, linea+6, INVERT_TEXT); //escribimos saludo en la primera linea
+    }else{
+        halLcdPrintLine(cadena, linea+6, NORMAL_TEXT); //escribimos saludo en la primera linea
+    }
+}
+
+void borrar_sub_menu(void)
+{
+    borrar(linea+3);
+    borrar(linea+4);
+    borrar(linea+5);
+    borrar(linea+6);
+}
+
+void borrar_lineas(void){
+    borrar(linea+2);
+    borrar(linea+3);
+    borrar(linea+4);
+    borrar(linea+5);
+    borrar(linea+6);
+    borrar(linea+7);
+}
+
+void borrar_sensores(void)
+{
+    borrar(3);
+    borrar(4);
+    borrar(5);
 }
 
 void main(void)
@@ -670,7 +708,7 @@ void main(void)
 
         //follow_left(left, center, right, obstacles);
         //follow_right(left, center, right);
-        menu_principal();
+
         if (estado_anterior != estado)  
         {
             //sprintf(cadena,"Estado %02d", estado);  // Guardamos en cadena la siguiente frase: Estado "valor del estado",
@@ -693,67 +731,134 @@ void main(void)
             Joystick center, estado = 7
             ***********************************************************/
 
+            if(menu){
+                menu_principal();
+            }else if(calibrar){
+                sub_menu();
+            }
+
+
             switch(estado){
             case S1:
 
                 if(menu)
                 {
-                    if(!calibrar){
-                        switch(option)
+                    //menu_principal();
+                    switch(option)
+                    {
+                    case 0:
+                        calibrar = 1;
+                        menu = 0;
+                        borrar_menu();
+                        sub_menu();
+                        break;
+                    case 1:
+                        menu = 0;
+                        action = 1;
+                        borrar_menu();
+                        while(estado != Jstick_Center)
                         {
-                        case 0:
-                            calibrar = 1;
-                            sub_menu();
-                            break;
-                        case 1:
 
-                                menu = 0;
-                                borrar_menu();
-                                while(estado != Jstick_Center)
-                                {
+                            distances = read_sensors();
+                            byte left = distances.StatusPacket[5];
+                            byte center = distances.StatusPacket[6];
+                            byte right = distances.StatusPacket[7];
+                            print_distance(left, center, right);
 
-                                    distances = read_sensors();
-                                    byte left = distances.StatusPacket[5];
-                                    byte center = distances.StatusPacket[6];
-                                    byte right = distances.StatusPacket[7];
+                            follow_left(left, center, right);
+                        }
+                        action = 0;
+                        menu = 1;
 
-                                    follow_left(left, center, right);
-                                }
-                                menu = 1;
-                            }else{
-                                distances = read_sensors();
-                                byte center = distances.StatusPacket[6];
-                                set_distance_center(center);
+                        break;
+                    case 2:
 
-                            break;
-                        case 2:
-                            menu=0;
-                            borrar_menu();
-                            while(estado != Jstick_Center)
-                            {
+                        menu=0;
+                        borrar_menu();
+                        while(estado != Jstick_Center)
+                        {
 
-                                distances = read_sensors();
-                                byte left = distances.StatusPacket[5];
-                                byte center = distances.StatusPacket[6];
-                                byte right = distances.StatusPacket[7];
+                            distances = read_sensors();
+                            byte left = distances.StatusPacket[5];
+                            byte center = distances.StatusPacket[6];
+                            byte right = distances.StatusPacket[7];
+                            print_distance(left, center, right);
 
-                                follow_right(left, center, right);
-                            }
-                            menu = 1;
-                            break;
+                            follow_right(left, center, right);
+                        }
+                        menu = 1;
+                        break;
+
+                    }
+
+                }else if(calibrar){
+                    sub_menu();
+                    byte left;
+                    byte center;
+                    byte right;
+                    action = 0;
+                    switch(option_sub){
+                    case 0:
+                        borrar_sub_menu();
+                        while(!calibra){
+
+                            distances = read_sensors();
+                            left = distances.StatusPacket[5];
+                            print_distance_sensor(left, 1);
+
 
                         }
+                        borrar(4);
+                        set_distance_left(left);
+                        calibra = 0;
+                        sub_menu();
+                        break;
+                    case 1:
+                        borrar_sub_menu();
+                        while(!calibra){
+
+                            distances = read_sensors();
+                            center = distances.StatusPacket[6];
+                            print_distance_sensor(center, 2);
+
+                        }
+                        borrar(4);
+                        set_distance_center(center);
+                        calibra = 0;
+                        sub_menu();
+                        break;
+                    case 2:
+                        borrar_sub_menu();
+                        while(!calibra){
+
+                            distances = read_sensors();
+                            right = distances.StatusPacket[7];
+                            print_distance_sensor(right, 3);
+                        }
+                        borrar(4);
+                        set_distance_right(right);
+                        calibra = 0;
+                        sub_menu();
+                        break;
+                    case 3:
+                        calibrar = 0;
+                        menu = 1;
+                        borrar_sub_menu();
+                        menu_principal();
+                        break;
                     }
+
                 }
+
                 break;
             case S2:
-                decrease_speed();
+                //decrease_speed();
                 break;
             case Jstick_Center:
                 stop();
-                borrar(3);
-                borrar(4);
-                borrar(5);
+                if(menu){
+                    borrar_sensores();
+                }
                 break;
             case Jstick_Left:
                 
@@ -762,13 +867,24 @@ void main(void)
                 
                 break;
             case Jstick_Up:
-                option = option - 1;
-                if(option == 255){
-                    option = 0;
+                if(menu){
+                    option = option - 1;
+                    if(option == 255){
+                        option = 0;
+                    }
+                }else if(calibrar){
+                    option_sub = option_sub - 1;
+                    if(option_sub == 255){
+                        option_sub = 0;
+                    }
                 }
+
                 break;
             case Jstick_Down:
-                option = (option + 1)%3;
+                if(menu)
+                    option = (option + 1)%3;
+                else if(calibrar)
+                    option_sub = (option_sub + 1)%4;
                 
                 break;
             default:

@@ -8,10 +8,6 @@
 
 //#include "lib_UART.h"
 #include "lib_motor.h"
-
-
-
-
 uint16_t velocidad = 250;
 char cadena[16];//Una linea entera con 15 caracteres visibles + uno oculto de terminacion de cadena (codigo ASCII 0)
 
@@ -104,15 +100,15 @@ void stop(void)
  * Dades d'entrada: distancia, ID del sensor (1 esquerra, 2 central, 3 dreta)
  *
  * Dades sortida: cap
- *
-void print_distance(uint8_t distance, uint8_t sensor)
+ **/
+void print_distance_sensor(uint8_t distance, uint8_t sensor)
 {
 
     switch(sensor){
 
     case 1:
         sprintf(cadena,"Left %03d", distance);
-        escribir(cadena,3); // Escribimos la cadena al LCD
+        escribir(cadena,4); // Escribimos la cadena al LCD
         break;
     case 2:
         sprintf(cadena,"Center %03d", distance);
@@ -120,13 +116,13 @@ void print_distance(uint8_t distance, uint8_t sensor)
         break;
     case 3:
         sprintf(cadena,"Right %03d", distance);
-        escribir(cadena,5); // Escribimos la cadena al LCD
+        escribir(cadena,4); // Escribimos la cadena al LCD
         break;
 
     }
 
 
-}*/
+}
 
 void print_distance(byte left, byte center, byte right)
 {
@@ -162,7 +158,7 @@ struct RxReturn read_sensors(void)
     byte parametres[2] = {SENSOR_LEFT, 3};
     TxPacket(SENSOR, 0x02, READ, parametres);
     resposta = RxPacket();
-    print_distance(resposta.StatusPacket[5], resposta.StatusPacket[6], resposta.StatusPacket[7]);
+    //print_distance(resposta.StatusPacket[5], resposta.StatusPacket[6], resposta.StatusPacket[7]);
     return resposta;
 } 
 
